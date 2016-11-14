@@ -10,6 +10,7 @@ import pid
 import time
 import textwrap
 import errors
+import random
 import utils
 import types
 import base64
@@ -34,7 +35,24 @@ class Client(object):
         self.session = session
         self.peer = None
         self.dead = False
-        self.last_pong = None
+        self.last_pong = -1.0
+
+    def unpair(self):
+        try:
+            if self.peer is not None:
+                self.peer.peer = None
+        except:
+            pass
+        self.peer = None
+
+    def check_peer(self):
+        try:
+            if self.peer is not None and self.peer.dead:
+                self.peer = None
+                self.peer.peer = None
+        except:
+            pass
+
 
 
 class App(Cmd):
@@ -71,6 +89,7 @@ class App(Cmd):
         self.client_db = {}
         self.running = True
         self.pinger_thread = None
+        self.assoc_thread = None
 
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
@@ -95,6 +114,9 @@ class App(Cmd):
         self.pinger_thread = Thread(target=self.pinger, args=())
         self.pinger_thread.start()
 
+        self.assoc_thread = Thread(target=self.assoc, args=())
+        self.assoc_thread.start()
+
         logger.info('Server started')
 
     def do_stop(self, line):
@@ -112,6 +134,65 @@ class App(Cmd):
                 cl.handler.try_send({'cmd':'ping'})
             time.sleep(1.0)
 
+    def assoc(self):
+        last_reassoc = 0.0
+        while self.running:
+            cur_time = time.time()
+            cls = self.client_db.items()
+
+            # Maintenance
+            for tup in cls:
+                cl = tup[1]
+
+                if cl.last_pong > 0.0 and cur_time - cl.last_pong > 7.0:
+                    logger.info('Making client dead: %s' % cl.uco)
+                    cl.dead = True
+
+                if cl.dead:
+                    cl.unpair()
+                    continue
+
+                cl.check_peer()
+
+            if cur_time - last_reassoc > 40.0:
+                logger.info('Global reassoc')
+                for tup in cls:
+                    cl = tup[1]
+                    cl.unpair()
+                last_reassoc = cur_time
+                continue
+
+            # Pairing of new peers
+            # a) get list of free ones
+            free_peers = []
+            for tup in cls:
+                cl = tup[1]
+                if cl.peer is None and not cl.dead:
+                    free_peers.append(cl)
+
+            while len(free_peers) >= 2:
+                p1 = random.choice(free_peers)
+                free_peers.remove(p1)
+
+                p2 = random.choice(free_peers)
+                free_peers.remove(p2)
+
+                self.pair_peers(p1, p2)
+
+            time.sleep(0.5)
+
+    def pair_peers(self, p1, p2):
+        logger.info('Pairing %s <-> %s ' % (p1.uco, p2.uco))
+        p1.peer = p2
+        p2.peer = p1
+        try:
+            p1.handler.try_send({'cmd': 'pair', 'uco': p2.uco})
+            p2.handler.try_send({'cmd': 'pair', 'uco': p1.uco})
+        except Exception as e:
+            logger.error('Exception in pairing %s <-> %s: %s' % (p1.uco, p2.uco, e))
+            p1.peer = None
+            p2.peer = None
+
     def on_connected(self, server, handler, client=None, socket=None, rfile=None, wfile=None):
         logger.info('client connected: %s' % str(client))
 
@@ -119,6 +200,7 @@ class App(Cmd):
         for tup in self.client_db.items():
             cl = tup[1]
             if cl.client == client:
+                cl.dead = True
                 logger.info('Client %s disconnected' % cl.uco)
                 return
 
@@ -157,11 +239,16 @@ class App(Cmd):
                 if uco in self.client_db:
                     self.terminate_client(self.client_db[uco])
 
-            elif cmd == 'send':
+            elif cmd == 'comm':
                 if uco in self.client_db:
                     cl = self.client_db[uco]
                     if cl.peer is None:
-                        handler.try_send({'error': 'no peer'})
+                        handler.try_send({'error': 'no peer', 'msg': js})
+                    else:
+                        try:
+                            cl.peer.handler.try_send(js)
+                        except:
+                            handler.try_send({'error': 'failed', 'msg': js})
 
             elif cmd == 'pong':
                 if uco in self.client_db:
@@ -184,6 +271,7 @@ class App(Cmd):
                 return
             client.handler.try_send({'exit': True, 'reason': 'new session'})
             client.handler.terminate()
+            client.dead = True
             # had peer???
         except:
             pass

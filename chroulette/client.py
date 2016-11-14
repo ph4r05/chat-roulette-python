@@ -31,6 +31,12 @@ def client(ip, port, message):
                         cmd = js['cmd']
                         if cmd == 'ping':
                             sock.sendall(json.dumps({"cmd": "pong", "uco":uco, "session":1, "nonce":"123456"})+'\n')
+                        elif cmd == 'comm':
+                            print 'COMM: ' + line
+
+                if random.randrange(0, 100) < 5:
+                    sock.sendall(json.dumps({"cmd": "comm", "uco":uco, "session":1, "nonce":"123456", "data":"nahaha"})+'\n')
+
 
             except socket.timeout:
                 pass
