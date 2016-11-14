@@ -144,7 +144,7 @@ class App(Cmd):
             for tup in cls:
                 cl = tup[1]
 
-                if cl.last_pong > 0.0 and cur_time - cl.last_pong > 7.0:
+                if cl.last_pong > 0.0 and cur_time - cl.last_pong > 7.0 and not cl.dead:
                     logger.info('Making client dead: %s' % cl.uco)
                     cl.dead = True
 
@@ -154,7 +154,7 @@ class App(Cmd):
 
                 cl.check_peer()
 
-            if cur_time - last_reassoc > 40.0:
+            if cur_time - last_reassoc > 30.0:
                 logger.info('Global reassoc')
                 for tup in cls:
                     cl = tup[1]

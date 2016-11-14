@@ -50,8 +50,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         server = self.server
         master = self.server.master
         self.request.settimeout(0.5)
-
-        logger.info('Client {} connected'.format(self.client_address))
+        #logger.info('Client {} connected'.format(self.client_address))
 
         # Register here...
         master.on_connected(server, self, self.client_address, self.request, self.rfile, self.wfile)
@@ -66,7 +65,6 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                     # Timeout occurred, do things
                     pass
 
-                #self.wfile.write(self.data.upper()+'\n')
         except Exception as e:
             pass
         master.on_disconnected(server, self, self.client_address, self.request, self.rfile, self.wfile)
