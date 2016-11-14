@@ -13,15 +13,28 @@ import errors
 import utils
 import types
 import base64
+import json
 import datetime
 from blessed import Terminal
 from core import Core
 import logging, coloredlogs
 import server
+from threading import Thread
 
 
 logger = logging.getLogger(__name__)
 coloredlogs.install()
+
+
+class Client(object):
+    def __init__(self, handler=None, uco=None, session=None, *args, **kwargs):
+        self.handler = handler
+        self.uco = uco
+        self.client = handler.client_address
+        self.session = session
+        self.peer = None
+        self.dead = False
+        self.last_pong = None
 
 
 class App(Cmd):
@@ -55,6 +68,9 @@ class App(Cmd):
         self.update_intro()
 
         self.server = server.MasterTCPServer(('127.0.0.1', 44333), master=self)
+        self.client_db = {}
+        self.running = True
+        self.pinger_thread = None
 
     def update_intro(self):
         self.intro = '-'*self.get_term_width() + \
@@ -75,11 +91,102 @@ class App(Cmd):
 
     def do_start(self, line):
         self.server.start()
+
+        self.pinger_thread = Thread(target=self.pinger, args=())
+        self.pinger_thread.start()
+
         logger.info('Server started')
 
     def do_stop(self, line):
+        self.running = False
         self.server.close()
         logger.info('Server stopped')
+
+    def pinger(self):
+        while self.running:
+            cls = self.client_db.items()
+            for tup in cls:
+                cl = tup[1]
+                if cl.dead:
+                    continue
+                cl.handler.try_send({'cmd':'ping'})
+            time.sleep(1.0)
+
+    def on_connected(self, server, handler, client=None, socket=None, rfile=None, wfile=None):
+        logger.info('client connected: %s' % str(client))
+
+    def on_disconnected(self, server, handler, client=None, socket=None, rfile=None, wfile=None):
+        for tup in self.client_db.items():
+            cl = tup[1]
+            if cl.client == client:
+                logger.info('Client %s disconnected' % cl.uco)
+                return
+
+        logger.info('disconnected: %s' % str(client))
+
+    def on_read(self, server, handler, client, data):
+        socket, rfile, wfile = handler.request, handler.rfile, handler.wfile
+        try:
+            js = json.loads(data)
+
+            if 'cmd' not in js:
+                logger.info('parsed: %s' % js)
+                return
+
+            cmd = js['cmd']
+            uco = js['uco']
+            session = js['session']
+            nonce = js['nonce']
+
+            if cmd == 'connect':
+                client = Client(handler=handler, uco=uco, session=session)
+                if uco in self.client_db:
+                    cl = self.client_db[uco]
+                    if cl.client != client.client:
+                        self.terminate_client(self.client_db[uco])
+
+                self.client_db[uco] = client
+                handler.try_send({'ack': nonce})
+
+                logger.info('New client registered, uco: %s' % uco)
+
+                # Try to find a peer... If there is any
+                # contact both peers then... inform they are connected together...
+
+            elif cmd == 'exit':
+                if uco in self.client_db:
+                    self.terminate_client(self.client_db[uco])
+
+            elif cmd == 'send':
+                if uco in self.client_db:
+                    cl = self.client_db[uco]
+                    if cl.peer is None:
+                        handler.try_send({'error': 'no peer'})
+
+            elif cmd == 'pong':
+                if uco in self.client_db:
+                    cl = self.client_db[uco]
+                    cl.dead = False
+                    cl.last_pong = time.time()
+
+            else:
+                handler.try_send({'error': 'Unknown command [%s]' % cmd})
+                logger.info('parsed: %s' % js)
+
+        except Exception as e:
+            logger.warning('Parsing exception: %s' % e)
+            handler.try_send({'exit': True})
+            handler.terminate()
+
+    def terminate_client(self, client):
+        try:
+            if client is None or client.dead:
+                return
+            client.handler.try_send({'exit': True, 'reason': 'new session'})
+            client.handler.terminate()
+            # had peer???
+        except:
+            pass
 
     def return_code(self, code=0):
         self.last_result = code

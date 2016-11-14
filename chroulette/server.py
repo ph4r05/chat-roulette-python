@@ -4,6 +4,7 @@ import SocketServer
 import logging, coloredlogs
 import json
 import re
+import queue
 
 
 __author__ = 'dusanklinec'
@@ -21,15 +22,54 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         self.logger = logging.getLogger('EchoRequestHandler')
         self.logger.debug('__init__')
         self.server = server
+        self.running = True
+        self.queue = None
+        self.data = None
         SocketServer.StreamRequestHandler.__init__(self, request, client_address, server)
         return
 
+    def send_msg(self, msg):
+        """
+        Enqueues message for the sending
+        """
+        pass
+
+    def try_send(self, dict):
+        try:
+            self.wfile.write(json.dumps(dict)+'\n')
+            return 0
+        except:
+            return 1
+
+    def terminate(self):
+        self.running = False
+
     def handle(self):
-        logger.info('Server: %s master: %s' % (self.server, self.server.master))
-        self.data = self.rfile.readline().strip()
-        print "{} wrote:".format(self.client_address[0])
-        print self.data
-        self.wfile.write(self.data.upper()+'\n')
+        # logger.info('Server: %s master: %s' % (self.server, self.server.master))
+        # socket: self.request
+        server = self.server
+        master = self.server.master
+        self.request.settimeout(0.5)
+
+        logger.info('Client {} connected'.format(self.client_address))
+
+        # Register here...
+        master.on_connected(server, self, self.client_address, self.request, self.rfile, self.wfile)
+        try:
+            while self.running:
+                try:
+                    self.data = self.rfile.readline().strip()
+                    if self.data is not None and len(self.data) > 0:
+                        master.on_read(server, self, self.client_address, self.data)
+
+                except socket.timeout:
+                    # Timeout occurred, do things
+                    pass
+
+                #self.wfile.write(self.data.upper()+'\n')
+        except Exception as e:
+            pass
+        master.on_disconnected(server, self, self.client_address, self.request, self.rfile, self.wfile)
 
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
