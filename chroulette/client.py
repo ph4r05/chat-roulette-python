@@ -13,9 +13,9 @@ __author__ = 'dusanklinec'
 def client(ip, port, message):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((ip, port))
-    uco = random.randrange(0, 500, 1)
+    uco = str(random.randrange(0, 500, 1))
     try:
-        sock.sendall(json.dumps({"cmd": "connect", "uco":uco, "session":1, "nonce":"123456"})+'\n')
+        sock.sendall(json.dumps({"cmd": "connect", "uco":uco, "session":"1", "nonce":"123456"})+'\n')
         sock.settimeout(0.5)
         while True:
             try:
@@ -30,12 +30,12 @@ def client(ip, port, message):
                     if 'cmd' in js:
                         cmd = js['cmd']
                         if cmd == 'ping':
-                            sock.sendall(json.dumps({"cmd": "pong", "uco":uco, "session":1, "nonce":"123456"})+'\n')
+                            sock.sendall(json.dumps({"cmd": "pong", "uco":uco, "session":"1", "nonce":"123456"})+'\n')
                         elif cmd == 'comm':
                             print 'COMM: ' + line
 
                 if random.randrange(0, 100) < 5:
-                    sock.sendall(json.dumps({"cmd": "comm", "uco":uco, "session":1, "nonce":"123456", "data":"nahaha"})+'\n')
+                    sock.sendall(json.dumps({"cmd": "comm", "uco":uco, "session":"1", "nonce":"123456", "data":"nahaha"})+'\n')
 
 
             except socket.timeout:
