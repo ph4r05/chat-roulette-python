@@ -85,7 +85,7 @@ class App(Cmd):
         self.t = Terminal()
         self.update_intro()
 
-        self.server = server.MasterTCPServer(('127.0.0.1', 44333), master=self)
+        self.server = server.MasterTCPServer(('0.0.0.0', 44333), master=self)
         self.client_db = {}
         self.running = True
         self.pinger_thread = None
@@ -224,8 +224,12 @@ class App(Cmd):
                 client = Client(handler=handler, uco=uco, session=session)
                 if uco in self.client_db:
                     cl = self.client_db[uco]
-                    if cl.client != client.client:
-                        self.terminate_client(self.client_db[uco])
+
+                    # terminate all the time - multiple instances...
+                    self.terminate_client(self.client_db[uco])
+
+                    # if cl.client != client.client:
+                    #    self.terminate_client(self.client_db[uco])
 
                 self.client_db[uco] = client
                 handler.try_send({'ack': nonce})
@@ -272,7 +276,6 @@ class App(Cmd):
             client.handler.try_send({'exit': True, 'reason': 'new session'})
             client.handler.terminate()
             client.dead = True
-            # had peer???
         except:
             pass
 
