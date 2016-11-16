@@ -28,6 +28,10 @@ coloredlogs.install()
 
 
 class Client(object):
+    """
+    Client record holder.
+    Stores information about connected client.
+    """
     def __init__(self, handler=None, uco=None, session=None, *args, **kwargs):
         self.handler = handler
         self.uco = uco
@@ -38,6 +42,10 @@ class Client(object):
         self.last_pong = -1.0
 
     def unpair(self):
+        """
+        Bidirectional pairing cancellation.
+        :return:
+        """
         try:
             if self.peer is not None:
                 self.peer.peer = None
@@ -46,6 +54,10 @@ class Client(object):
         self.peer = None
 
     def check_peer(self):
+        """
+        If remote peer is dead, deassociate.
+        :return:
+        """
         try:
             if self.peer is not None and self.peer.dead:
                 self.peer = None
@@ -109,6 +121,12 @@ class App(Cmd):
         print('usage  - writes this usage info')
 
     def do_start(self, line):
+        """
+        Start the TCP server and management threads
+        :param line:
+        :return:
+        """
+        self.running = True
         self.server.start()
 
         self.pinger_thread = Thread(target=self.pinger, args=())
@@ -120,6 +138,11 @@ class App(Cmd):
         logger.info('Server started')
 
     def do_stop(self, line):
+        """
+        Stops the running server and management threads.
+        :param line:
+        :return:
+        """
         self.running = False
         self.server.close()
         logger.info('Server stopped')
@@ -190,6 +213,13 @@ class App(Cmd):
             time.sleep(0.5)
 
     def pair_peers(self, p1, p2):
+        """
+        Utility method for pairing p1 and p2.
+        Each peer is notified about this event by a new message
+        :param p1:
+        :param p2:
+        :return:
+        """
         logger.info('Pairing %s <-> %s ' % (p1.uco, p2.uco))
         p1.peer = p2
         p2.peer = p1
@@ -202,9 +232,29 @@ class App(Cmd):
             p2.peer = None
 
     def on_connected(self, server, handler, client=None, socket=None, rfile=None, wfile=None):
+        """
+        Called by the server handler when new client connects
+        :param server:
+        :param handler:
+        :param client:
+        :param socket:
+        :param rfile:
+        :param wfile:
+        :return:
+        """
         logger.info('client connected: %s' % str(client))
 
     def on_disconnected(self, server, handler, client=None, socket=None, rfile=None, wfile=None):
+        """
+        Called by the server handler when client disconnects
+        :param server:
+        :param handler:
+        :param client:
+        :param socket:
+        :param rfile:
+        :param wfile:
+        :return:
+        """
         for tup in self.client_db.items():
             cl = tup[1]
             if cl.client == client:
@@ -215,6 +265,14 @@ class App(Cmd):
         logger.info('disconnected: %s' % str(client))
 
     def on_read(self, server, handler, client, data):
+        """
+        Called by the server handler when a new message is received from the client.
+        :param server:
+        :param handler:
+        :param client:
+        :param data:
+        :return:
+        """
         socket, rfile, wfile = handler.request, handler.rfile, handler.wfile
         try:
             js = json.loads(data)
@@ -278,6 +336,11 @@ class App(Cmd):
             handler.terminate()
 
     def terminate_client(self, client):
+        """
+        Helper method for terminating clients connection.
+        :param client:
+        :return:
+        """
         try:
             if client is None or client.dead:
                 return
