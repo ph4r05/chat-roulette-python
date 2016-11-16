@@ -125,6 +125,10 @@ class App(Cmd):
         logger.info('Server stopped')
 
     def pinger(self):
+        """
+        Main pinger worker method. Pings each connected client each second.
+        :return:
+        """
         while self.running:
             cls = self.client_db.items()
             for tup in cls:
@@ -135,6 +139,11 @@ class App(Cmd):
             time.sleep(1.0)
 
     def assoc(self):
+        """
+        Main association worker method.
+        Takes care about the client list and re-associations.
+        :return:
+        """
         last_reassoc = 0.0
         while self.running:
             cur_time = time.time()
