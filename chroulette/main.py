@@ -281,10 +281,10 @@ class App(Cmd):
                 logger.info('parsed: %s' % js)
                 return
 
-            cmd = js['cmd']
-            uco = js['uco']
-            session = js['session']
-            nonce = js['nonce']
+            cmd = str(js['cmd'])
+            uco = str(js['uco'])[:24]
+            session = str(js['session'])[:24]
+            nonce = str(js['nonce'])[:24]
 
             if cmd == 'connect':
                 client = Client(handler=handler, uco=uco, session=session)
