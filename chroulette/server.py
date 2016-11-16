@@ -140,21 +140,6 @@ def client(ip, port, message):
         sock.close()
 
 
-if __name__ == "__main__":
-    # Port 0 means to select an arbitrary unused port
-    HOST, PORT = "localhost", 4444
-
-    server = MasterTCPServer((HOST, PORT))
-    server.start()
-
-    ip, port = 'localhost', 4444
-
-    print "Server loop running in thread:"
-    client(ip, port, "Hello World 1\n")
-    client(ip, port, "Hello World 2\n")
-    client(ip, port, "Hello World 3\n")
-
-    server.close()
 
 
 
