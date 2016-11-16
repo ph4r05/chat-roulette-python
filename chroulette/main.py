@@ -155,7 +155,6 @@ class App(Cmd):
                 cl.check_peer()
 
             if cur_time - last_reassoc > 30.0:
-                logger.info('Global reassoc')
                 for tup in cls:
                     cl = tup[1]
                     cl.unpair()
