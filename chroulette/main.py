@@ -275,6 +275,11 @@ class App(Cmd):
         """
         socket, rfile, wfile = handler.request, handler.rfile, handler.wfile
         try:
+            if len(data) > 32768:
+                handler.try_send({'error': 'message too long'})
+                return
+
+            # Load json message from the received data
             js = json.loads(data)
 
             if 'cmd' not in js:
@@ -285,6 +290,9 @@ class App(Cmd):
             uco = str(js['uco'])[:24]
             session = str(js['session'])[:24]
             nonce = str(js['nonce'])[:24]
+
+            # uco sanitization
+            uco = ''.join(e for e in uco if e.isalnum())
 
             if cmd == 'connect':
                 client = Client(handler=handler, uco=uco, session=session)
