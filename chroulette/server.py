@@ -3,6 +3,7 @@ import threading
 import SocketServer
 import logging, coloredlogs
 import json
+import time
 import re
 import queue
 
@@ -11,7 +12,6 @@ __author__ = 'dusanklinec'
 
 
 logger = logging.getLogger(__name__)
-coloredlogs.install()
 
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
@@ -39,6 +39,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             self.wfile.write(json.dumps(dict)+'\n')
             return 0
         except:
+            try:
+                self.server.master.on_error(self.server, self, self.client_address)
+            except:
+                pass
+
+            self.terminate()
             return 1
 
     def terminate(self):
@@ -59,13 +65,17 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                     self.data = self.rfile.readline().strip()
                     if self.data is not None and len(self.data) > 0:
                         master.on_read(server, self, self.client_address, self.data)
-
+                    time.sleep(0.1)
                 except socket.timeout:
                     # Timeout occurred, do things
                     pass
 
         except Exception as e:
-            pass
+            self.terminate()
+            try:
+                master.on_error(server, self, self.client_address)
+            except:
+                pass
         master.on_disconnected(server, self, self.client_address, self.request, self.rfile, self.wfile)
 
 
@@ -128,6 +138,7 @@ class MasterTCPServer(object):
 
 
 def client(ip, port, message):
+    coloredlogs.install()
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((ip, port))
     try:

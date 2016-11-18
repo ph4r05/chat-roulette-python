@@ -40,6 +40,7 @@ class Client(object):
         self.peer = None
         self.dead = False
         self.last_pong = -1.0
+        self.ping_sent = 0
 
     def unpair(self):
         """
@@ -158,7 +159,8 @@ class App(Cmd):
                 cl = tup[1]
                 if cl.dead:
                     continue
-                cl.handler.try_send({'cmd':'ping'})
+                cl.handler.try_send({'cmd': 'ping'})
+                cl.ping_sent += 1
             time.sleep(1.0)
 
     def assoc(self):
@@ -169,6 +171,7 @@ class App(Cmd):
         """
         last_reassoc = 0.0
         while self.running:
+            time.sleep(0.1)
             cur_time = time.time()
             cls = self.client_db.items()
 
@@ -178,6 +181,10 @@ class App(Cmd):
 
                 if cl.last_pong > 0.0 and cur_time - cl.last_pong > 7.0 and not cl.dead:
                     logger.info('Making client dead: %s' % cl.uco)
+                    cl.dead = True
+
+                if cl.ping_sent > 7 and cl.last_pong <= 0.0:
+                    logger.info('Making client dead2: %s' % cl.uco)
                     cl.dead = True
 
                 if cl.dead:
@@ -342,6 +349,9 @@ class App(Cmd):
             logger.warning('Parsing exception: %s' % e)
             handler.try_send({'exit': True})
             handler.terminate()
+
+    def on_error(self, server, handler, client):
+        pass
 
     def terminate_client(self, client):
         """
