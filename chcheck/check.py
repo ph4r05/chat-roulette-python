@@ -5,16 +5,13 @@ import re
 import math
 import types
 import time
-import errors
 import random
-import utils
 import types
 import base64
 import json
 import itertools
 from datetime import datetime
 from blessed import Terminal
-from core import Core
 import logging, coloredlogs
 
 
